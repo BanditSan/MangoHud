@@ -1292,6 +1292,7 @@ void HudElements::duration(){
 }
 
 void HudElements::graphs(){
+    std::lock_guard<std::mutex> l(currentLogDataMutex);
     ImguiNextColumnFirstItem();
     ImGui::Dummy(ImVec2(0.0f, real_font_size.y));
     const std::string& value = HUDElements.ordered_functions[HUDElements.place].value;
@@ -1387,6 +1388,21 @@ void HudElements::graphs(){
         HUDElements.TextColored(HUDElements.colors.engine, "%s", "RAM");
     }
 #endif
+    if (starts_with(value, "custom_")) {
+        const char* key = value.c_str() + strlen("custom_");
+        for (auto& it : graph_data){
+            arr.push_back(float(it.custom_metrics[key]));
+        }
+
+        HUDElements.max = 50;
+        HUDElements.min = 0;
+        ImGui::TextColored(HUDElements.colors.engine, "%s", key);
+    }
+    for (size_t i = 0; i < HUDElements.params->table_columns - 1; i++)
+        ImGui::TableNextColumn();
+    ImGui::Dummy(ImVec2(0.0f, real_font_size.y));
+    if (!arr.empty())
+        right_aligned_text(HUDElements.colors.text, HUDElements.ralign_width * 1.3, "%.1f ms", arr.back());
     ImGui::PopFont();
     ImGui::Dummy(ImVec2(0.0f,5.0f));
     ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
@@ -1599,7 +1615,9 @@ void HudElements::sort_elements(const std::pair<std::string, std::string>& optio
             for (auto& val : values) {
                 if (find(permitted_params.begin(), permitted_params.end(), val) != permitted_params.end()) {
                     ordered_functions.push_back({graphs, "graph: " + val, val});
-                } else {
+            } else if (starts_with(val, "custom_")) {
+                ordered_functions.push_back({graphs, val});
+            } else {
                     SPDLOG_ERROR("Unrecognized graph type: {}", val);
                 }
             }

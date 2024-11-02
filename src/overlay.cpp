@@ -148,6 +148,7 @@ void update_hw_info(const struct overlay_params& params, uint32_t vendorID)
       getIoStats(g_io_stats);
 #endif
    if (gpus && gpus->active_gpu()) {
+      std::lock_guard<std::mutex> l(currentLogDataMutex);
       currentLogData.gpu_load = gpus->active_gpu()->metrics.load;
       currentLogData.gpu_temp = gpus->active_gpu()->metrics.temp;
       currentLogData.gpu_core_clock = gpus->active_gpu()->metrics.CoreClock;
@@ -251,6 +252,14 @@ void update_hud_info_with_frametime(struct swapchain_stats& sw_stats, const stru
    frametime = frametime_ms;
    fps = double(1000 / frametime_ms);
    if (fpsmetrics) fpsmetrics->update(now, fps);
+
+   std::lock_guard<std::mutex> l(currentLogDataMutex);
+   // Save data for graphs
+   if (graph_data.size() >= kMaxGraphEntries)
+       graph_data.pop_front();
+   graph_data.push_back(currentLogData);
+   logger->notify_data_valid();
+   HUDElements.update_exec();
 
    if (elapsed >= params.fps_sampling_period) {
       if (!hw_update_thread)
